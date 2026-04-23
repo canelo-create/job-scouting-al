@@ -60,3 +60,5 @@ supabase/.branches
 
 # local logs
 *.log
+
+.vercel
