@@ -5,8 +5,12 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getAuthedUser } from "@/lib/auth/require-user";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { isAnthropicConfigured } from "@/lib/anthropic/client";
 import FitBadge from "@/components/pipeline/FitBadge";
 import StatusBadge from "@/components/pipeline/StatusBadge";
+import ApplyHelper from "@/components/pipeline/ApplyHelper";
+import GenerateCvButton from "@/components/cv/GenerateCvButton";
+import CVDocumentList from "@/components/cv/CVDocumentList";
 import {
   STATUS_LABELS,
   STATUS_ORDER,
@@ -44,12 +48,34 @@ async function loadOffer(userId: string, id: string) {
   };
 }
 
+async function loadDocs(userId: string, offerId: string) {
+  if (!isSupabaseConfigured()) return [];
+  const sb = createAdminClient();
+  const { data } = await sb
+    .from("cv_documents")
+    .select("id, kind, version, created_at")
+    .eq("user_id", userId)
+    .eq("offer_id", offerId)
+    .order("created_at", { ascending: false });
+  return (data ?? []) as Array<{
+    id: string;
+    kind: string;
+    version: number;
+    created_at: string;
+  }>;
+}
+
 export default async function OfferDetailPage({ params }: Params) {
   const { id } = await params;
   const user = await getAuthedUser();
   if (!user) return notFound();
-  const offer = await loadOffer(user.id, id);
+  const [offer, docs] = await Promise.all([
+    loadOffer(user.id, id),
+    loadDocs(user.id, id),
+  ]);
   if (!offer) return notFound();
+  const hasCv = docs.some((d) => d.kind === "cv");
+  const anthropicReady = isAnthropicConfigured();
 
   async function setStatus(formData: FormData) {
     "use server";
@@ -115,13 +141,20 @@ export default async function OfferDetailPage({ params }: Params) {
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Cambiar estado</CardTitle>
+          <CardTitle className="text-base">Aplicar</CardTitle>
         </CardHeader>
-        <CardContent>
-          <form action={setStatus} className="flex flex-wrap items-end gap-2">
+        <CardContent className="flex flex-col gap-3">
+          <ApplyHelper
+            offerId={offer.id}
+            sourceUrl={offer.source_url}
+            title={offer.title}
+            companyName={offer.companies?.name ?? null}
+            hasCv={hasCv}
+          />
+          <form action={setStatus} className="flex flex-wrap items-end gap-2 border-t border-border pt-3">
             <div className="flex flex-col gap-1">
               <label className="text-xs text-muted-foreground" htmlFor="status-select">
-                Nuevo estado
+                O cambiá estado manual
               </label>
               <select
                 id="status-select"
@@ -136,10 +169,29 @@ export default async function OfferDetailPage({ params }: Params) {
                 ))}
               </select>
             </div>
-            <Button type="submit" size="sm">
+            <Button type="submit" size="sm" variant="outline">
               Actualizar
             </Button>
           </form>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center justify-between gap-2 text-base">
+            <span>CV & Cover adaptados</span>
+            <GenerateCvButton
+              offerId={offer.id}
+              disabledReason={
+                anthropicReady
+                  ? undefined
+                  : "Falta ANTHROPIC_API_KEY en env vars"
+              }
+            />
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <CVDocumentList docs={docs} />
         </CardContent>
       </Card>
 

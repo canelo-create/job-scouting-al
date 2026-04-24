@@ -1,14 +1,20 @@
 import Link from "next/link";
-import { FileText, Sparkles } from "lucide-react";
+import { FileText, Sparkles, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isSupabaseConfigured } from "@/lib/supabase/server";
 import { getAuthedUser } from "@/lib/auth/require-user";
 import EmptyState from "@/components/common/EmptyState";
+import { isAnthropicConfigured } from "@/lib/anthropic/client";
 import { format } from "date-fns";
 
 export const dynamic = "force-dynamic";
+
+const KIND_LABELS: Record<string, string> = {
+  cv: "CV",
+  cover_letter: "Cover letter",
+};
 
 type CV = {
   id: string;
@@ -16,6 +22,7 @@ type CV = {
   version: number;
   offer_id: string | null;
   created_at: string;
+  offers: { title: string; companies: { name: string } | null } | null;
 };
 
 async function loadCVs(userId: string): Promise<CV[]> {
@@ -23,28 +30,28 @@ async function loadCVs(userId: string): Promise<CV[]> {
   const sb = createAdminClient();
   const { data } = await sb
     .from("cv_documents")
-    .select("id, kind, version, offer_id, created_at")
+    .select("id, kind, version, offer_id, created_at, offers(title, companies(name))")
     .eq("user_id", userId)
     .order("created_at", { ascending: false })
-    .limit(50);
-  return (data ?? []) as CV[];
+    .limit(100);
+  return (data ?? []) as unknown as CV[];
 }
 
 export default async function CVPage() {
   const user = await getAuthedUser();
   const cvs = user ? await loadCVs(user.id) : [];
-  const anthropicConfigured = Boolean(process.env.ANTHROPIC_API_KEY);
+  const anthropicReady = isAnthropicConfigured();
 
   return (
     <div className="flex flex-col gap-6">
       <div>
         <h2 className="font-heading text-xl font-semibold">CV / Cover</h2>
         <p className="text-sm text-muted-foreground">
-          Generador adaptado por oferta usando Claude + tu perfil YAML.
+          Versiones generadas por oferta usando Claude + tu CV base.
         </p>
       </div>
 
-      {!anthropicConfigured ? (
+      {!anthropicReady ? (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">
@@ -53,9 +60,9 @@ export default async function CVPage() {
           </CardHeader>
           <CardContent className="flex flex-col gap-2 text-sm text-muted-foreground">
             <p>
-              Este módulo necesita `ANTHROPIC_API_KEY`. Anthropic da $5 free
-              credits al crear cuenta; después pay-per-use (Haiku ~$0.003/1k
-              tokens).
+              Falta <code>ANTHROPIC_API_KEY</code>. Gratis con $5 credits al crear
+              cuenta. Pay-per-use después (Haiku ~$0.003/1k tokens ≈ $0.01 por CV
+              completo).
             </p>
             <Button asChild size="sm" variant="outline" className="w-fit">
               <a
@@ -66,6 +73,9 @@ export default async function CVPage() {
                 Crear API key
               </a>
             </Button>
+            <p className="text-[11px]">
+              Una vez creada, pegámela y la inyecto a Vercel env + redeploy.
+            </p>
           </CardContent>
         </Card>
       ) : null}
@@ -74,7 +84,7 @@ export default async function CVPage() {
         <EmptyState
           icon={FileText}
           title="Sin CVs generados todavía"
-          description="Desde el detalle de una oferta podés pedir 'Generar CV adaptado' — devuelve markdown + .docx."
+          description="Desde el detalle de una oferta → 'Adaptar CV + Cover' genera ambos y quedan listos acá."
           action={
             <Button asChild variant="outline" size="sm">
               <Link href="/pipeline">Ver pipeline</Link>
@@ -83,24 +93,37 @@ export default async function CVPage() {
         />
       ) : (
         <div className="flex flex-col gap-2">
-          {cvs.map((cv) => (
+          {cvs.map((d) => (
             <div
-              key={cv.id}
+              key={d.id}
               className="flex items-center justify-between rounded-md border border-border bg-card p-3 text-sm"
             >
               <div>
                 <p className="font-medium">
-                  {cv.kind} v{cv.version}
+                  {KIND_LABELS[d.kind] ?? d.kind} v{d.version} ·{" "}
+                  {d.offers?.companies?.name ?? "—"}
                 </p>
                 <p className="text-[11px] text-muted-foreground">
-                  {format(new Date(cv.created_at), "yyyy-MM-dd HH:mm")}
+                  {d.offers?.title ?? "(base)"} ·{" "}
+                  {format(new Date(d.created_at), "yyyy-MM-dd HH:mm")}
                 </p>
               </div>
-              {cv.offer_id ? (
+              <div className="flex gap-2">
                 <Button asChild variant="ghost" size="sm">
-                  <Link href={`/pipeline/${cv.offer_id}`}>Ver oferta</Link>
+                  <Link href={`/cv/${d.id}`}>Ver</Link>
                 </Button>
-              ) : null}
+                <Button asChild variant="outline" size="sm">
+                  <a href={`/api/cv/${d.id}/download`}>
+                    <Download className="size-3" />
+                    .docx
+                  </a>
+                </Button>
+                {d.offer_id ? (
+                  <Button asChild variant="ghost" size="sm">
+                    <Link href={`/pipeline/${d.offer_id}`}>Oferta</Link>
+                  </Button>
+                ) : null}
+              </div>
             </div>
           ))}
         </div>

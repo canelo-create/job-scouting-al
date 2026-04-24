@@ -1,5 +1,7 @@
 /** Canonical candidate profile (spec §3). Seeded on first login. */
 
+import { BASE_CV } from "./base-cv";
+
 export const CANDIDATE_PROFILE = {
   nombre: "Andrés Lince García",
   nickname: "Canelo",
@@ -102,6 +104,7 @@ export const CANDIDATE_PROFILE = {
     "SQL_gap_para_algunos_ops",
     "riesgo_sobrecualificacion_entry_level_europeo",
   ],
+  base_cv: BASE_CV,
 } as const;
 
 export type CandidateProfile = typeof CANDIDATE_PROFILE;

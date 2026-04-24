@@ -194,6 +194,12 @@ export async function updateOfferStatus(
   return { ok: true };
 }
 
+export async function markAsAppliedAction(
+  offerId: string,
+): Promise<{ ok: boolean; error?: string }> {
+  return updateOfferStatus(offerId, "aplicado");
+}
+
 export async function deleteOffer(offerId: string): Promise<void> {
   if (!isSupabaseConfigured()) return;
   const user = await requireUser();
