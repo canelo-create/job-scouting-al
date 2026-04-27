@@ -7,6 +7,7 @@ import { isSupabaseConfigured } from "@/lib/supabase/server";
 import { getAccount } from "@/lib/serpapi/quota";
 import EmptyState from "@/components/common/EmptyState";
 import RunNowButton from "@/components/radar/RunNowButton";
+import RunAggregatorsButton from "@/components/radar/RunAggregatorsButton";
 import { format } from "date-fns";
 
 export const dynamic = "force-dynamic";
@@ -85,7 +86,10 @@ export default async function RadarPage() {
             SerpApi scout. Cron diario 08:00 CET. Gasto: ~3 searches/día.
           </p>
         </div>
-        <RunNowButton />
+        <div className="flex flex-wrap gap-2">
+          <RunAggregatorsButton />
+          <RunNowButton />
+        </div>
       </div>
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
