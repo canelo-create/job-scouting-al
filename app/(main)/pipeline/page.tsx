@@ -12,12 +12,16 @@ import { isSupabaseConfigured } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 
-async function loadOffers(userId: string): Promise<Offer[]> {
+type OfferWithCompany = Offer & {
+  companies: { name: string } | null;
+};
+
+async function loadOffers(userId: string): Promise<OfferWithCompany[]> {
   if (!isSupabaseConfigured()) return [];
   const sb = createAdminClient();
   const { data, error } = await sb
     .from("offers")
-    .select("*")
+    .select("*, companies(name)")
     .eq("user_id", userId)
     .order("opportunity_priority_score", { ascending: false, nullsFirst: false })
     .order("created_at", { ascending: false });
@@ -25,7 +29,7 @@ async function loadOffers(userId: string): Promise<Offer[]> {
     console.error("[pipeline] load offers error", error);
     return [];
   }
-  return (data ?? []) as Offer[];
+  return (data ?? []) as unknown as OfferWithCompany[];
 }
 
 export default async function PipelinePage() {
@@ -46,7 +50,7 @@ export default async function PipelinePage() {
   const offers = await loadOffers(user.id);
 
   // Group by status
-  const grouped = new Map<OfferStatus, Offer[]>();
+  const grouped = new Map<OfferStatus, OfferWithCompany[]>();
   for (const s of STATUS_ORDER) grouped.set(s, []);
   for (const o of offers) {
     grouped.get(o.status)?.push(o);
@@ -92,7 +96,11 @@ export default async function PipelinePage() {
                 </h3>
                 <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                   {list.map((offer) => (
-                    <OfferListItem key={offer.id} offer={offer} />
+                    <OfferListItem
+                      key={offer.id}
+                      offer={offer}
+                      companyName={offer.companies?.name ?? null}
+                    />
                   ))}
                 </div>
               </section>
