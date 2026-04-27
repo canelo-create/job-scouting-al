@@ -1,9 +1,12 @@
-import { CheckCircle2, XCircle } from "lucide-react";
+import Link from "next/link";
+import { CheckCircle2, XCircle, Globe } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getAuthedUser } from "@/lib/auth/require-user";
 import { isSupabaseConfigured } from "@/lib/supabase/server";
 import { GRADUATION_DATE, runwayDays } from "@/lib/constants";
 import SignOutButton from "@/components/common/SignOutButton";
+import { SOURCES } from "@/lib/sources/registry";
 
 export const dynamic = "force-dynamic";
 
@@ -99,6 +102,24 @@ export default async function AjustesPage() {
               );
             })}
           </ul>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center justify-between gap-2 text-base">
+            <span className="flex items-center gap-2">
+              <Globe className="size-4" /> Plataformas / Fuentes
+            </span>
+            <Button asChild variant="outline" size="sm">
+              <Link href="/ajustes/sources">Ver registry ({SOURCES.length})</Link>
+            </Button>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="text-sm text-muted-foreground">
+          {SOURCES.filter((s) => s.priority === 1).length} integrables ahora ·{" "}
+          {SOURCES.filter((s) => s.priority === 2).length} scrape/extension ·{" "}
+          {SOURCES.filter((s) => s.priority === 3).length} manual o N/A.
         </CardContent>
       </Card>
     </div>
